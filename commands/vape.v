@@ -7,7 +7,7 @@ fn main() {
 	mut vape := cli.Command{
 		name: 'vape'
 		description: 'The Vape Web Microframework Command-line Helper'
-		version: '0.1.0'
+		version: '0.2.0'
 		parent: 0
 	}
 	vape.add_command(cli.Command{
@@ -103,8 +103,9 @@ fn dev_handler(cmd cli.Command) {
 		println('   ↜ $path')
 	}
 	println('')
-	os.mkdir('build')?
+	if !os.exists('build') { os.mkdir('build')? }
 	mut output := os.create('build/dev.v') or {
+		println('🧨 Failed to create dev.v. Exiting.')
 		return
 	}
 	output.writeln('// Imports')
