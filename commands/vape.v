@@ -58,7 +58,9 @@ fn init_handler(cmd cli.Command) {
 	if !os.exists('endpoints') {
 		print(' missing… creating…')
 		os.flush()
-		os.mkdir('endpoints')?
+		os.mkdir('endpoints') or {
+			return
+		}
 		print(' adding sample…')
 		os.flush()
 		os.write_file('endpoints/hello.v', "import net.http\n\n['/hello']\nfn hello(req http.Request) http.Response {\n\treturn http.Response{\n\t\theaders: {\n\t\t\t'Content-Type': 'text/plain'\n\t\t}\n\t\ttext: 'Hello World'\n\t\tstatus_code: 200\n\t}\n}\n")
@@ -79,7 +81,6 @@ fn dev_handler(cmd cli.Command) {
 	mut imports := ['import exastencil.vape']
 	mut handlers := []string{}
 	mut endpoints := []string{}
-
 	// Split and merge all endpoints into these sections
 	mut current_path := ''
 	for path in os.walk_ext('endpoints', 'v') {
@@ -88,13 +89,16 @@ fn dev_handler(cmd cli.Command) {
 		}
 		for line in lines {
 			if line.starts_with('import') {
-				if line in imports {} else { imports << line }
+				if line in imports {
+				} else {
+					imports << line
+				}
 			} else if line.starts_with('[') {
 				current_path = line.trim('[]')
 			} else if line.starts_with('fn ') {
 				handler_name := line.split(' ')[1].split('(')[0]
 				handlers << line
-				endpoints << "\t\tvape.Endpoint{\n\t\t\tpath: $current_path\n\t\t\thandler: $handler_name\n\t\t},"
+				endpoints << '\t\tvape.Endpoint{\n\t\t\tpath: $current_path\n\t\t\thandler: $handler_name\n\t\t},'
 				current_path = ''
 			} else {
 				handlers << line
@@ -103,21 +107,30 @@ fn dev_handler(cmd cli.Command) {
 		println('   ↜ $path')
 	}
 	println('')
-	if !os.exists('build') { os.mkdir('build')? }
+	if !os.exists('build') {
+		os.mkdir('build') or {
+			return
+		}
+	}
 	mut output := os.create('build/dev.v') or {
 		println('🧨 Failed to create dev.v. Exiting.')
 		return
 	}
 	output.writeln('// Imports')
-	for item in imports { output.writeln(item) }
+	for item in imports {
+		output.writeln(item)
+	}
 	output.writeln('\n// Handlers')
-	for line in handlers { output.writeln(line) }
+	for line in handlers {
+		output.writeln(line)
+	}
 	output.writeln('\n// Server')
 	output.writeln('server := vape.Server{\n\tport: 6789\n\tendpoints: [')
-	for item in endpoints { output.writeln(item) }
+	for item in endpoints {
+		output.writeln(item)
+	}
 	output.writeln('\t]\n}\nserver.serve()')
 	output.close()
-
 	println('🧠 Compiling development server…')
 	os.exec('v build/dev.v') or {
 		println('🧨 Failed to compile development build. Check dev.v for problems or report it.')

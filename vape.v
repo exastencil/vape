@@ -7,41 +7,49 @@ import strings
 
 const (
 	http_statuses = {
-		"200" : "OK"
-		"302" : "Found"
-		"400" : "Bad Request"
-		"404" : "Not Found"
-		"500" : "Internal Server Error"
+		'200': 'OK'
+		'302': 'Found'
+		'400': 'Bad Request'
+		'404': 'Not Found'
+		'500': 'Internal Server Error'
 	}
-	NOT_FOUND = http.Response{
-		status_code: 404,
-		text: "404 Not Found",
-		headers: { 'Content-Type' : 'text/plain' }
+	NOT_FOUND     = http.Response{
+		status_code: 404
+		text: '404 Not Found'
+		headers: {
+			'Content-Type': 'text/plain'
+		}
 	}
-	BAD_REQUEST = http.Response{
-		status_code: 400,
-		text: "400 Bad Request",
-		headers: { 'Content-Type' : 'text/plain' }
+	BAD_REQUEST   = http.Response{
+		status_code: 400
+		text: '400 Bad Request'
+		headers: {
+			'Content-Type': 'text/plain'
+		}
 	}
 )
 
-pub type Handler fn(req http.Request) http.Response
+pub type Handler = fn (req http.Request) http.Response
 
 pub struct Endpoint {
-	host string = "127.0.0.1"
-	path string = "/"
+	host    string = '127.0.0.1'
+	path    string = '/'
 	handler Handler
 }
 
 pub struct Server {
-	port int
+	port      int
 	endpoints []Endpoint
 }
 
 pub fn (s Server) serve() {
-	l := net.listen(s.port) or { panic('failed to listen') }
+	l := net.listen(s.port) or {
+		panic('failed to listen')
+	}
 	for {
-		socket := l.accept() or { panic('connection failed') }
+		socket := l.accept() or {
+			panic('connection failed')
+		}
 		request := parse_request(socket) or {
 			http.Request{}
 		}
@@ -55,14 +63,15 @@ fn parse_request(socket net.Socket) ?http.Request {
 	// Parse the first line
 	// "GET / HTTP/1.1"
 	vals := first_line.split(' ')
-	if vals.len < 2 { return error("vape.parse_request: Not enough information in request") }
+	if vals.len < 2 {
+		return error('vape.parse_request: Not enough information in request')
+	}
 	mut headers := []string{}
 	mut body := ''
 	mut in_headers := true
 	mut len := 0
 	mut body_len := 0
-
-	for _ in 0..100 {
+	for _ in 0 .. 100 {
 		line := socket.read_line()
 		sline := line.trim('\r\n')
 		if sline == '' {
@@ -84,7 +93,6 @@ fn parse_request(socket net.Socket) ?http.Request {
 			}
 		}
 	}
-
 	return http.Request{
 		headers: http.parse_headers(headers)
 		data: body.trim('\r\n')
@@ -96,7 +104,7 @@ fn parse_request(socket net.Socket) ?http.Request {
 }
 
 fn (s Server) handle_request(request http.Request) http.Response {
-	print("[$request.method $request.url]")
+	print('[$request.method $request.url]')
 	url := urllib.parse(request.url) or {
 		return BAD_REQUEST
 	}
@@ -109,19 +117,19 @@ fn (s Server) handle_request(request http.Request) http.Response {
 }
 
 fn send_response(response http.Response, socket net.Socket) {
-	println(" => <$response.status_code $response.text>")
-
+	println(' => <$response.status_code $response.text>')
 	mut buffer := strings.new_builder(1024)
-	defer { buffer.free() }
-	buffer.write("HTTP/1.1 $response.status_code ${http_statuses[response.status_code.str()]}\r\n")
-	buffer.write("Content-Length: $response.text.len\r\n")
-
-	for key, value in response.headers {
-		buffer.write("$key: $value\r\n")
+	defer {
+		buffer.free()
 	}
-	buffer.write("Server: vape\r\n")
-	buffer.write("Connection: close\r\n")
-	buffer.write("\r\n")
+	buffer.write('HTTP/1.1 $response.status_code ${http_statuses[response.status_code.str()]}\r\n')
+	buffer.write('Content-Length: $response.text.len\r\n')
+	for key, value in response.headers {
+		buffer.write('$key: $value\r\n')
+	}
+	buffer.write('Server: vape\r\n')
+	buffer.write('Connection: close\r\n')
+	buffer.write('\r\n')
 	buffer.write(response.text.str())
 	socket.send_string(buffer.str()) or {
 		// TODO: Log an error
