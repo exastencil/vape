@@ -75,12 +75,23 @@ pub type Handler = fn (req Request) Response
 pub struct Endpoint {
 	host    string = '127.0.0.1'
 	path    string = '/'
+	method  string = 'GET'
 	handler Handler
+}
+
+// Mount a request handler at a path
+pub fn (mut s Server) mount(method string, path string, handler Handler) {
+	s.endpoints << Endpoint {
+		path: path
+		method: method
+		handler: handler
+	}
 }
 
 pub struct Server {
 	port      int
-	endpoints []Endpoint
+	pub mut:
+		endpoints []Endpoint
 }
 
 pub fn (s Server) serve() {

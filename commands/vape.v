@@ -64,12 +64,12 @@ fn init_handler(cmd cli.Command) {
 		}
 		print(' adding sample…')
 		os.flush()
-		os.write_file('endpoints/hello.v', "import net.http\n\n['/hello']\nfn hello(req http.Request) http.Response {\n\treturn http.Response{\n\t\theaders: {\n\t\t\t'Content-Type': 'text/plain'\n\t\t}\n\t\ttext: 'Hello World'\n\t\tstatus_code: 200\n\t}\n}\n")
+		os.write_file('endpoints/hello.v', "import exastencil.vape\n\nserver.mount('GET', '/', fn (req vape.Request) vape.Response {\n\treturn vape.Response{\n\t\tbody: 'Hello World'\n\t}\n})\n")
 		println(' done!')
 	} else if os.is_dir('endpoints') && os.is_dir_empty('endpoints') {
 		print(' found empty… adding sample…')
 		os.flush()
-		os.write_file('endpoints/hello.v', "import net.http\n\n['/hello']\nfn hello(req http.Request) http.Response {\n\treturn http.Response{\n\t\theaders: {\n\t\t\t'Content-Type': 'text/plain'\n\t\t}\n\t\ttext: 'Hello World'\n\t\tstatus_code: 200\n\t}\n}\n")
+		os.write_file('endpoints/hello.v', "import exastencil.vape\n\nserver.mount('GET', '/', fn (req vape.Request) vape.Response {\n\treturn vape.Response{\n\t\tbody: 'Hello World'\n\t}\n})\n")
 		println(' done!')
 	} else {
 		println(' found!')
@@ -78,12 +78,10 @@ fn init_handler(cmd cli.Command) {
 
 fn dev_handler(cmd cli.Command) {
 	println('🔪 Dissecting handlers…')
-	// Build three separate sections for the dev server file
+	// Build two separate sections for the dev server file
 	mut imports := ['import exastencil.vape']
 	mut handlers := []string{}
-	mut endpoints := []string{}
 	// Split and merge all endpoints into these sections
-	mut current_path := ''
 	for path in os.walk_ext('endpoints', 'v') {
 		lines := os.read_lines(path) or {
 			continue
@@ -94,13 +92,6 @@ fn dev_handler(cmd cli.Command) {
 				} else {
 					imports << line
 				}
-			} else if line.starts_with('[') {
-				current_path = line.trim('[]')
-			} else if line.starts_with('fn ') {
-				handler_name := line.split(' ')[1].split('(')[0]
-				handlers << line
-				endpoints << '\t\tvape.Endpoint{\n\t\t\tpath: $current_path\n\t\t\thandler: $handler_name\n\t\t},'
-				current_path = ''
 			} else {
 				handlers << line
 			}
@@ -121,16 +112,13 @@ fn dev_handler(cmd cli.Command) {
 	for item in imports {
 		output.writeln(item)
 	}
+	output.writeln('\n// Server')
+	output.writeln('server := vape.Server{port: 6789}')
 	output.writeln('\n// Handlers')
 	for line in handlers {
 		output.writeln(line)
 	}
-	output.writeln('\n// Server')
-	output.writeln('server := vape.Server{\n\tport: 6789\n\tendpoints: [')
-	for item in endpoints {
-		output.writeln(item)
-	}
-	output.writeln('\t]\n}\nserver.serve()')
+	output.writeln('server.serve()')
 	output.close()
 	println('🧠 Compiling development server…')
 	os.system('v build/dev.v')
