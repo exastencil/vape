@@ -4,7 +4,7 @@ import net
 import strings
 
 const (
-	VERSION = '0.2.1'
+	version = '0.2.1'
 )
 
 // Request is passed as input to a Handler
