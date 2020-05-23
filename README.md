@@ -100,13 +100,21 @@ action.
 
 ## Planned Features
 
-- Hot Code Reloading for `vape dev`
-- Individual Endpoint Compilation
-- Standardized logging
+- Dynamic routing for local development
+- Named route parameters and query parameters
 - Host context
+- Standardized logging
+- Built-in benchmarking
+- Hot code reloading for local development
+- Individual endpoint compilation
 - Build checksums
+
+And some longer term, bigger picture features…
+
 - Deployment helper as in `vape deploy`
 - Entity persistence
+- Scheduled handlers (cron-like handlers)
+- Messaging handlers (e.g. email)
 
 ## Author
 
