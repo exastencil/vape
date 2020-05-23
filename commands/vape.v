@@ -4,11 +4,27 @@ import exastencil.vape
 import cli
 import os
 
+const (
+	sample_endpoint = "import exastencil.vape
+
+server.mount('GET', '/', fn (req vape.Request) vape.Response {
+	return vape.Response{
+		body: 'Hello World'
+	}
+})
+"
+	sample_gitignore = '# Keep only source code in endpoints
+/endpoints/**
+!/endpoints/**/*.v
+# Ignore build artifacts
+/build'
+)
+
 fn main() {
 	mut vape := cli.Command{
 		name: 'vape'
 		description: 'The Vape Web Microframework Command-line Helper'
-		version: vape.VERSION
+		version: vape.version
 		parent: 0
 	}
 	vape.add_command(cli.Command{
@@ -27,22 +43,45 @@ fn main() {
 }
 
 fn init_handler(cmd cli.Command) {
-	// Before anything, check that V is installed…
+	check_v()
+	check_vape()
+	check_writable()
+	setup_gitignore()
+	setup_endpoints()
+}
+
+fn dev_handler(cmd cli.Command) {
+	check_v()
+	check_vape()
+	check_writable()
+	merge()
+	compile()
+	launch()
+}
+
+fn check_v() {
 	if os.system('which v > /dev/null') == 1 {
 		println('🧨 V is not installed. Exiting.')
-		return
+		exit(1)
 	}
-	// Also, vape is needed in addition to the executable
+}
+
+fn check_vape() {
 	if !os.is_dir('${os.home_dir()}/.vmodules/exastencil/vape') {
 		println('🧨 Vape is not installed. Install it with `v install exastencil.vape`')
-		return
+		exit(1)
 	}
-	// Then, check that the folder is writable
+}
+
+fn check_writable() {
 	os.is_writable_folder('.') or {
 		println('🧨 Folder is not writable. Exiting.')
-		return
+		exit(1)
 	}
-	// Set up a basic gitignore if one isn't present
+}
+
+// Set up a basic gitignore if one isn't present
+fn setup_gitignore() {
 	print('📄 Checking for a gitignore…')
 	os.flush()
 	if os.exists('.gitignore') {
@@ -50,10 +89,13 @@ fn init_handler(cmd cli.Command) {
 	} else {
 		print(' missing… creating…')
 		os.flush()
-		os.write_file('.gitignore', '# Keep only source code in endpoints\n/endpoints/**\n!/endpoints/**/*.v\n# Ignore build artifacts\n/build')
+		os.write_file('.gitignore', sample_gitignore)
 		println(' done!')
 	}
-	// Create endpoints folder with example if empty
+}
+
+// Create endpoints folder with example if empty
+fn setup_endpoints() {
 	print('🎯 Checking for endpoints folder…')
 	os.flush()
 	if !os.exists('endpoints') {
@@ -64,19 +106,20 @@ fn init_handler(cmd cli.Command) {
 		}
 		print(' adding sample…')
 		os.flush()
-		os.write_file('endpoints/hello.v', "import exastencil.vape\n\nserver.mount('GET', '/', fn (req vape.Request) vape.Response {\n\treturn vape.Response{\n\t\tbody: 'Hello World'\n\t}\n})\n")
+		os.write_file('endpoints/hello.v', sample_endpoint)
 		println(' done!')
 	} else if os.is_dir('endpoints') && os.is_dir_empty('endpoints') {
 		print(' found empty… adding sample…')
 		os.flush()
-		os.write_file('endpoints/hello.v', "import exastencil.vape\n\nserver.mount('GET', '/', fn (req vape.Request) vape.Response {\n\treturn vape.Response{\n\t\tbody: 'Hello World'\n\t}\n})\n")
+		os.write_file('endpoints/hello.v', sample_endpoint)
 		println(' done!')
 	} else {
 		println(' found!')
 	}
 }
 
-fn dev_handler(cmd cli.Command) {
+// Merges all endpoint files into one file
+fn merge() {
 	println('🔪 Dissecting handlers…')
 	// Build two separate sections for the dev server file
 	mut imports := ['import exastencil.vape']
@@ -120,8 +163,14 @@ fn dev_handler(cmd cli.Command) {
 	}
 	output.writeln('server.serve()')
 	output.close()
+}
+
+fn compile() {
 	println('🧠 Compiling development server…')
 	os.system('v build/dev.v')
+}
+
+fn launch() {
 	if os.exists('build/dev') {
 		println('🚀 Launching development server on port 6789… Ctrl + C to exit.')
 		os.system('build/dev')
