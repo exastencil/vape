@@ -1,5 +1,6 @@
 module main
 
+import exastencil.vape
 import cli
 import os
 
@@ -7,7 +8,7 @@ fn main() {
 	mut vape := cli.Command{
 		name: 'vape'
 		description: 'The Vape Web Microframework Command-line Helper'
-		version: '0.2.0'
+		version: vape.VERSION
 		parent: 0
 	}
 	vape.add_command(cli.Command{
@@ -132,10 +133,9 @@ fn dev_handler(cmd cli.Command) {
 	output.writeln('\t]\n}\nserver.serve()')
 	output.close()
 	println('🧠 Compiling development server…')
-	os.exec('v build/dev.v') or {
-		println('🧨 Failed to compile development build. Check dev.v for problems or report it.')
-		return
+	os.system('v build/dev.v')
+	if os.exists('build/dev') {
+		println('🚀 Launching development server on port 6789… Ctrl + C to exit.')
+		os.system('build/dev')
 	}
-	println('🚀 Launching development server on port 6789… Ctrl + C to exit.')
-	os.system('build/dev')
 }

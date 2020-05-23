@@ -1,35 +1,76 @@
 module vape
 
 import net
-import net.http
-import net.urllib
 import strings
 
 const (
-	http_statuses = {
-		'200': 'OK'
-		'302': 'Found'
-		'400': 'Bad Request'
-		'404': 'Not Found'
-		'500': 'Internal Server Error'
-	}
-	NOT_FOUND     = http.Response{
-		status_code: 404
-		text: '404 Not Found'
-		headers: {
-			'Content-Type': 'text/plain'
-		}
-	}
-	BAD_REQUEST   = http.Response{
-		status_code: 400
-		text: '400 Bad Request'
-		headers: {
-			'Content-Type': 'text/plain'
-		}
-	}
+	VERSION = '0.2.1'
 )
 
-pub type Handler = fn (req http.Request) http.Response
+// Request is passed as input to a Handler
+pub struct Request {
+	pub:
+		method string = 'GET'
+		host string
+		path string
+		query map[string]string
+		form map[string]string
+		body string
+		headers map[string]string
+}
+
+fn (req Request) url() string {
+	return '$req.host$req.path'
+}
+
+// Response is the return value of a Handler
+pub struct Response {
+	pub mut:
+		status int = 200
+		body string = ''
+		content_type string = 'text/plain; charset=utf-8'
+		headers map[string]string
+}
+
+fn http_status_descriptor(status int) string {
+	msg := match status {
+		100 { 'Continue' }
+		101 { 'Switching Protocols' }
+		200 { 'OK' }
+		201 { 'Created' }
+		202 { 'Accepted' }
+		203 { 'Non-Authoritive Information' }
+		204 { 'No Content' }
+		205 { 'Reset Content' }
+		206 { 'Partial Content' }
+		300 { 'Multiple Choices' }
+		301 { 'Moved Permanently' }
+		400 { 'Bad Request' }
+		401 { 'Unauthorized' }
+		403 { 'Forbidden' }
+		404 { 'Not Found' }
+		405 { 'Method Not Allowed' }
+		408 { 'Request Timeout' }
+		500 { 'Internal Server Error' }
+		501 { 'Not Implemented' }
+		502 { 'Bad Gateway' }
+		else { '-' }
+	}
+	return msg
+}
+
+// This function can be used to quickly build a response with a specific status
+pub fn response(status int, content_type string) Response {
+	return Response{
+		status: status
+		body: '$status ${http_status_descriptor(status)}'
+		headers: {
+			'Content-Type': content_type
+		}
+	}
+}
+
+pub type Handler = fn (req Request) Response
 
 pub struct Endpoint {
 	host    string = '127.0.0.1'
@@ -51,14 +92,14 @@ pub fn (s Server) serve() {
 			panic('connection failed')
 		}
 		request := parse_request(socket) or {
-			http.Request{}
+			Request{}
 		}
 		response := s.handle_request(request)
 		send_response(response, socket)
 	}
 }
 
-fn parse_request(socket net.Socket) ?http.Request {
+fn parse_request(socket net.Socket) ?Request {
 	first_line := socket.read_line()
 	// Parse the first line
 	// "GET / HTTP/1.1"
@@ -66,7 +107,7 @@ fn parse_request(socket net.Socket) ?http.Request {
 	if vals.len < 2 {
 		return error('vape.parse_request: Not enough information in request')
 	}
-	mut headers := []string{}
+	mut headers := map[string]string{}
 	mut body := ''
 	mut in_headers := true
 	mut len := 0
@@ -81,7 +122,10 @@ fn parse_request(socket net.Socket) ?http.Request {
 			in_headers = false
 		}
 		if in_headers {
-			headers << sline
+			words := sline.split(': ')
+			if words.len == 2 {
+				headers[words[0]] = words[1]
+			}
 			if sline.starts_with('Content-Length') {
 				len = sline.all_after(': ').int()
 			}
@@ -93,44 +137,39 @@ fn parse_request(socket net.Socket) ?http.Request {
 			}
 		}
 	}
-	return http.Request{
-		headers: http.parse_headers(headers)
-		data: body.trim('\r\n')
-		ws_func: 0
-		user_ptr: 0
+	return Request{
+		headers: headers
+		body: body.trim('\r\n')
 		method: vals[0]
-		url: vals[1]
+		path: vals[1]
 	}
 }
 
-fn (s Server) handle_request(request http.Request) http.Response {
-	print('[$request.method $request.url]')
-	url := urllib.parse(request.url) or {
-		return BAD_REQUEST
-	}
+fn (s Server) handle_request(request Request) Response {
+	print('[$request.method ${request.url()}]')
 	for endpoint in s.endpoints {
-		if endpoint.path == url.path {
+		if endpoint.path == request.path {
 			return endpoint.handler(request)
 		}
 	}
-	return NOT_FOUND
+	return response(404, 'text/plain; charset=utf-8')
 }
 
-fn send_response(response http.Response, socket net.Socket) {
-	println(' => <$response.status_code $response.text>')
+fn send_response(response Response, socket net.Socket) {
+	println(' => <$response.status $response.body>')
 	mut buffer := strings.new_builder(1024)
 	defer {
 		buffer.free()
 	}
-	buffer.write('HTTP/1.1 $response.status_code ${http_statuses[response.status_code.str()]}\r\n')
-	buffer.write('Content-Length: $response.text.len\r\n')
+	buffer.write('HTTP/1.1 $response.status ${http_status_descriptor(response.status)}\r\n')
+	buffer.write('Content-Length: $response.body.len\r\n')
 	for key, value in response.headers {
 		buffer.write('$key: $value\r\n')
 	}
 	buffer.write('Server: vape\r\n')
 	buffer.write('Connection: close\r\n')
 	buffer.write('\r\n')
-	buffer.write(response.text.str())
+	buffer.write(response.body.str())
 	socket.send_string(buffer.str()) or {
 		// TODO: Log an error
 	}
