@@ -1,7 +1,7 @@
 Module {
 	name: 'vape'
 	author: 'exastencil'
-	version: '0.2.1'
+	version: '0.3.0'
 	repo_url: 'https://github.com/exastencil/vape'
 	vcs: 'git'
 	deps: []
