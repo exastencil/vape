@@ -156,14 +156,46 @@ fn parse_request(socket net.Socket) ?Request {
 	}
 }
 
+// handle_request finds the endpoint for a request and calls its handler
 fn (s Server) handle_request(request Request) Response {
 	print('[$request.method ${request.url()}]')
 	for endpoint in s.endpoints {
-		if endpoint.path == request.path {
-			return endpoint.handler(request)
+		if match_path(request.path, endpoint.path) {
+			mut query := request.query
+			for index, segment in endpoint.path.trim('/').split('/') {
+				if segment.starts_with(':') {
+					specified := request.path.trim('/').split('/')[index]
+					query[segment.all_after(':')] = specified
+				}
+			}
+			return endpoint.handler(Request{
+				method: request.method
+				host: request.host
+				path: request.path
+				query: query
+				form: request.form
+				body: request.body
+				headers: request.headers
+			})
 		}
 	}
 	return response(404, 'text/plain; charset=utf-8')
+}
+
+// match_path checks if an endpoint path is a potential match for a request path
+fn match_path(path string, endpoint string) bool {
+	// Shortcircuit exact match as optimization
+	if path == endpoint { return true }
+	// Shortcircuit segment count mismatch
+	path_segments := path.trim('/').split('/')
+	route_segments := endpoint.trim('/').split('/')
+	if path_segments.len != route_segments.len { return false }
+	// Otherwise check every segment for exact matches
+	for index, path_segment in path_segments {
+		if route_segments[index].starts_with(':') { continue }
+		if path_segment != route_segments[index] { return false }
+	}
+	return true
 }
 
 fn send_response(response Response, socket net.Socket) {
